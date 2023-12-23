@@ -19,16 +19,39 @@ class RecipeSerializer(serializers.ModelSerializer):
         model = Recipe
         fields = ['id', 'title', 'time_minutes', 'price', 'link','tags']
         read_only_fields = ['id']
-    #add functionality to support tag creation for nested ag serializer(only allows read by default)
-    def create(self,validated_data):
-        tags = validated_data.pop('tags',[])
-        recipe = Recipe.objects.create(**validated_data)
+    #add functionality to support tag creation for nested serializer(only allows read by default)
+    # def _get_or_create_tags(self,tags,recipe):
+    #     auth_user = self.context['request'].user
+    #     for tag in tags:
+    #         tag_obj,created =Tag.objects.get_or_create()
+    #         recipe.tags.add(tag_obj)
+    
+    def _get_or_create_tags(self, tags, recipe):
+        """Handle getting or creating tags as needed."""
         auth_user = self.context['request'].user
         for tag in tags:
-            tag_obj,created = Tag.objects.get_or_create(user=auth_user,**tag)
+            tag_obj, created = Tag.objects.get_or_create(
+                user=auth_user,
+                **tag,
+            )
             recipe.tags.add(tag_obj)
-        return recipe
 
+    def create(self,validated_data):#create recipe and create or assign tags
+       tags = validated_data.pop('tags',[])
+       recipe = Recipe.objects.create(**validated_data)
+       self._get_or_create_tags(tags,recipe)
+       return recipe
+    
+    def update(self,instance,validated_data):
+        tags = validated_data.pop('tags',None)
+        if tags is not None:
+            instance.tags.clear()
+            self._get_or_create_tags(tags,instance)
+        for attr,value in validated_data.items():
+            setattr(instance,attr,value)
+
+        instance.save()
+        return instance
 
 
 
